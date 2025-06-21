@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Manager</title>
+  <style>
+    body {
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+    h1, h2 {
+      color: #343a40;
+    }
+
+    form {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 700px;
+}
+
+    input, textarea, select, button {
+      display: block;
+      margin-top: 10px;
+      padding: 10px;
+      width: 100%;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 30px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px;
+      border: 1px solid #dee2e6;
+      text-align: left;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f1f1f1;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #28a745;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      display: none;
+      box-shadow: 0 0 8px rgba(0,0,0,0.2);
+      animation: fadeInOut 3s ease forwards;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Task Manager</h1>
+
+  <form id="taskForm">
+    <input type="text" id="title" placeholder="Title" required />
+    <textarea id="description" placeholder="Description" required></textarea>
+    <select id="status">
+      <option value="false">Incomplete</option>
+      <option value="true">Completed</option>
+    </select>
+    <button type="submit">Create Task</button>
+  </form>
+
+  <h2>All Tasks</h2>
+  <table id="taskTable">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="toast" id="toast">Success!</div>
+
+  <script>
+    const form = document.getElementById('taskForm');
+    const taskTable = document.querySelector('#taskTable tbody');
+    const toast = document.getElementById('toast');
+
+    const showToast = (msg, color = '#28a745') => {
+      toast.style.background = color;
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    };
+
+    async function fetchTasks() {
+  const res = await fetch('/api/tasks');
+  const tasks = await res.json();
+  taskTable.innerHTML = '';
+  tasks.forEach(task => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input value="${task.title}" data-id="${task._id}" class="edit-title" /></td>
+      <td><input value="${task.description}" data-id="${task._id}" class="edit-description" /></td>
+      <td style="background-color: ${task.completed ? '#d4edda' : 'transparent'};">
+        <select data-id="${task._id}" class="edit-status">
+          <option value="false" ${!task.completed ? 'selected' : ''}>Incomplete</option>
+          <option value="true" ${task.completed ? 'selected' : ''}>Completed</option>
+        </select>
+      </td>
+      <td>
+        <button onclick="updateTask('${task._id}')">💾 Save</button>
+        <button onclick="deleteTask('${task._id}')">🗑️ Delete</button>
+      </td>
+    `;
+    taskTable.appendChild(row);
+  });
+}
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const task = {
+        title: document.getElementById('title').value,
+        description: document.getElementById('description').value,
+        completed: document.getElementById('status').value === 'true'
+      };
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(task)
+      });
+      if (res.ok) showToast("Task Created!");
+      form.reset();
+      fetchTasks();
+    });
+
+    async function updateTask(id) {
+      const title = document.querySelector(`.edit-title[data-id="${id}"]`).value;
+      const description = document.querySelector(`.edit-description[data-id="${id}"]`).value;
+      const completed = document.querySelector(`.edit-status[data-id="${id}"]`).value === 'true';
+
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, completed })
+      });
+
+      if (res.ok) showToast("Task Updated!");
+      fetchTasks();
+    }
+
+    async function deleteTask(id) {
+      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      if (res.ok) showToast("Task Deleted", '#dc3545');
+      fetchTasks();
+    }
+
+    fetchTasks();
+  </script>
+</body>
+</html>
